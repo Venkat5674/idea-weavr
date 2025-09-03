@@ -86,9 +86,84 @@ export const FlowChart = () => {
     );
   }, [setNodes]);
 
+  const generateFromPrompt = useCallback(async (prompt: string, apiKey: string) => {
+    try {
+      const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=' + apiKey, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `Create a detailed mindmap/flowchart structure for: "${prompt}". 
+
+Please respond with ONLY a valid JSON object containing nodes and edges arrays. Use this exact format:
+
+{
+  "nodes": [
+    {
+      "id": "unique-id",
+      "type": "custom",
+      "position": {"x": number, "y": number},
+      "data": {
+        "label": "Node text",
+        "nodeType": "text|decision|process|start"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "unique-edge-id",
+      "source": "source-node-id",
+      "target": "target-node-id",
+      "type": "default"
+    }
+  ]
+}
+
+Create 5-10 nodes with meaningful connections. Position nodes in a logical flow layout. Use different nodeType values (text, decision, process, start) appropriately.`
+            }]
+          }]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      
+      if (!content) {
+        throw new Error('No content received from API');
+      }
+
+      // Extract JSON from the response
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No valid JSON found in response');
+      }
+
+      const parsedData = JSON.parse(jsonMatch[0]);
+      
+      if (!parsedData.nodes || !parsedData.edges) {
+        throw new Error('Invalid response format - missing nodes or edges');
+      }
+
+      // Clear existing nodes and add generated ones
+      setNodes(parsedData.nodes);
+      setEdges(parsedData.edges);
+      
+    } catch (error) {
+      console.error('Generation error:', error);
+      throw error;
+    }
+  }, [setNodes, setEdges]);
+
   return (
     <div className="flex h-screen bg-canvas-background">
-      <Sidebar />
+      <Sidebar onGenerateFromPrompt={generateFromPrompt} />
       <div className="flex-1" ref={reactFlowWrapper}>
         <ReactFlow
           nodes={nodes}

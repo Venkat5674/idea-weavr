@@ -1,6 +1,9 @@
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Separator } from './ui/separator';
+import { Input } from './ui/input';
+import { Textarea } from './ui/textarea';
+import { Label } from './ui/label';
 import { 
   FileText, 
   Diamond, 
@@ -9,8 +12,12 @@ import {
   Download, 
   Upload, 
   Trash2,
-  Zap
+  Zap,
+  Sparkles,
+  Key
 } from 'lucide-react';
+import { useState } from 'react';
+import { useToast } from './ui/use-toast';
 
 const nodeTypes = [
   { type: 'text', icon: FileText, label: 'Text Node', color: 'text-foreground' },
@@ -19,10 +26,52 @@ const nodeTypes = [
   { type: 'start', icon: Circle, label: 'Start/End', color: 'text-success' },
 ];
 
-export const Sidebar = () => {
+export const Sidebar = ({ onGenerateFromPrompt }: { onGenerateFromPrompt: (prompt: string, apiKey: string) => Promise<void> }) => {
+  const [apiKey, setApiKey] = useState('');
+  const [prompt, setPrompt] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const { toast } = useToast();
+
   const onDragStart = (event: React.DragEvent, nodeType: string) => {
     event.dataTransfer.setData('application/reactflow', nodeType);
     event.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleGenerate = async () => {
+    if (!apiKey.trim()) {
+      toast({
+        title: "API Key Required",
+        description: "Please enter your Gemini API key",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!prompt.trim()) {
+      toast({
+        title: "Prompt Required", 
+        description: "Please enter a prompt to generate the mindmap",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      await onGenerateFromPrompt(prompt, apiKey);
+      toast({
+        title: "Success",
+        description: "Mindmap generated successfully!"
+      });
+    } catch (error) {
+      toast({
+        title: "Generation Failed",
+        description: error instanceof Error ? error.message : "Failed to generate mindmap",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -65,6 +114,54 @@ export const Sidebar = () => {
               </Card>
             );
           })}
+        </div>
+
+        <Separator className="mb-6" />
+
+        {/* AI Generation */}
+        <h3 className="text-sm font-semibold text-sidebar-foreground mb-4 flex items-center gap-2">
+          <Sparkles className="w-4 h-4" />
+          AI Generation
+        </h3>
+        
+        <div className="space-y-3 mb-6">
+          <div>
+            <Label htmlFor="apiKey" className="text-xs text-sidebar-foreground/80 mb-1 flex items-center gap-1">
+              <Key className="w-3 h-3" />
+              Gemini API Key
+            </Label>
+            <Input
+              id="apiKey"
+              type="password"
+              placeholder="Enter your API key"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              className="bg-sidebar-accent/30 border-sidebar-border text-xs"
+            />
+          </div>
+          
+          <div>
+            <Label htmlFor="prompt" className="text-xs text-sidebar-foreground/80 mb-1">
+              Prompt
+            </Label>
+            <Textarea
+              id="prompt"
+              placeholder="Describe the mindmap you want to create..."
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              className="bg-sidebar-accent/30 border-sidebar-border text-xs min-h-[60px] resize-none"
+            />
+          </div>
+          
+          <Button 
+            onClick={handleGenerate}
+            disabled={isGenerating}
+            size="sm"
+            className="w-full gap-2"
+          >
+            <Sparkles className="w-4 h-4" />
+            {isGenerating ? 'Generating...' : 'Generate Mindmap'}
+          </Button>
         </div>
 
         <Separator className="mb-6" />
